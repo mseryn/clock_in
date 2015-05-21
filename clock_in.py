@@ -7,7 +7,6 @@ import sqlite3, flask, hashlib, datetime, functools, contextlib, user_maker
 time_limit = 300 # 5 minutes
 
 app = flask.Flask(__name__)
-
 app.secret_key = b'w\xec\x90\xfd\xac\x847k(\x16\x96\xb9"\x95\xdf9\x10v\\\xf0\xcd\xfe\xa2k'
 
 # Authenticating session
@@ -21,18 +20,6 @@ def requires_auth(f):
         return f(*args, **kwargs)
     return decorated
 
-
-def requires_admin(f):
-    @functools.wraps(f)
-    def decorated(*args, **kwargs):
-        if 'username' not in flask.session:
-            flask.flash('You have been logged out due to inactivity.')
-            return flask.redirect(flask.url_for('login'))
-        if not is_admin(flask.session['username']):
-            flask.flash('You don\'t have permission to view that page.')
-            return flask.redirect(flask.url_for('buttons'))
-        return f(*args, **kwargs)
-    return decorated
 
 # Loading the database
 
@@ -54,7 +41,70 @@ def init_db():
             db.cursor().executescript(f.read())
         db.commit()
 
-# Login check function
+# FOLLOWING ARE METHODS USED BY THE PAGES
+
+# Check if user is administrator, determines whether or not add user link displays
+def is_admin(in_username):
+    c = flask.g.db.cursor()
+    c.execute('select admin from users where username=?', (in_username,))
+    ret = c.fetchone()
+    if (ret is None) or (ret[0]==0):
+        print('returned f')
+        return False
+    else:
+        return True
+
+# Determines whether or not a page can be displayed based on admin privlidges of user
+# DOES NOT check if user is admin - that is done by is_admin(user)
+def requires_admin(f):
+    @functools.wraps(f)
+    def decorated(*args, **kwargs):
+        if 'username' not in flask.session:
+            flask.flash('You have been logged out due to inactivity.')
+            return flask.redirect(flask.url_for('login'))
+        if not is_admin(flask.session['username']):
+            flask.flash('You don\'t have permission to view that page.')
+            return flask.redirect(flask.url_for('buttons'))
+        return f(*args, **kwargs)
+    return decorated
+
+# Writes to db for checkin column
+def write_checkin(in_username):
+    c = flask.g.db.cursor()
+    c.execute("insert into history ('userid', 'checkin') select id, ? from users where username=?", (datetime.datetime.now(), in_username))
+    flask.g.db.commit()
+    return c.lastrowid
+
+# Writes to db for checkout column
+def write_checkout(in_username, date = None):
+    c = flask.g.db.cursor()
+    if date == None:
+        date = datetime.datetime.now()
+    c.execute("update history set checkout=? where checkout is null and userid=(select id from users where username=?)", (date, in_username))
+    flask.g.db.commit()
+    return c.rowcount
+
+# Checks if user has a value in history for both check in and out or just check in
+# Determines which buttons show in Buttons
+def checked_in(in_username):
+    c = flask.g.db.cursor()
+    c.execute('select username, checkin from users, history where users.username=? and users.id=history.userid and checkout is null', (in_username,))
+    ret = c.fetchone()
+    print(ret)
+    if ret is None: 
+        return False
+    recorded_time = datetime.datetime.strptime(ret[1], '%Y-%m-%d %H:%M:%S.%f')   
+    if recorded_time.date() == datetime.date.today():
+        return True
+    else:
+        write_checkout(in_username, datetime.datetime.combine(recorded_time.date(), datetime.datetime.time(23, 59, 59)))
+
+    return True
+
+
+# END OF METHODS USED BY THE PAGES
+
+# Login page script
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -78,11 +128,15 @@ def login():
             return flask.redirect(flask.url_for('buttons'))
     return flask.render_template('login.html', error=error)
 
+# Logout page script
+
 @app.route('/logout')
 def logout():
     flask.flash('You have been logged out.')
     flask.session.pop('username', None)
     return flask.redirect(flask.url_for('login'))
+
+# Buttons page script
 
 @app.route('/buttons', methods=['GET', 'POST'])
 @requires_auth
@@ -109,6 +163,8 @@ def buttons():
 
     return flask.render_template('buttons.html', checked_in=checked_in(flask.session['username']), is_admin=is_admin(flask.session['username']))
 
+# Add user page script
+
 @app.route('/add_user', methods=['GET', 'POST'])
 @requires_admin
 def add_user():
@@ -119,46 +175,6 @@ def add_user():
         admin = flask.request.form['checkbox']
         print(admin)
     return flask.render_template('add_user.html', is_admin=is_admin(flask.session['username'])) 
-
-def is_admin(in_username):
-    c = flask.g.db.cursor()
-    c.execute('select admin from users where username=?', (in_username,))
-    ret = c.fetchone()
-    if (ret is None) or (ret[0]==0):
-        print('returned f')
-        return False
-    else:
-        return True
-
-def write_checkin(in_username):
-    c = flask.g.db.cursor()
-    c.execute("insert into history ('userid', 'checkin') select id, ? from users where username=?", (datetime.datetime.now(), in_username))
-    flask.g.db.commit()
-    return c.lastrowid
-
-def checked_in(in_username):
-    c = flask.g.db.cursor()
-    c.execute('select username, checkin from users, history where users.username=? and users.id=history.userid and checkout is null', (in_username,))
-    ret = c.fetchone()
-    print(ret)
-    if ret is None: 
-        return False
-    recorded_time = datetime.datetime.strptime(ret[1], '%Y-%m-%d %H:%M:%S.%f')   
-    if recorded_time.date() == datetime.date.today():
-        return True
-    else:
-        write_checkout(in_username, datetime.datetime.combine(recorded_time.date(), datetime.datetime.time(23, 59, 59)))
-
-    return True
-
-def write_checkout(in_username, date = None):
-    c = flask.g.db.cursor()
-    if date == None:
-        date = datetime.datetime.now()
-    c.execute("update history set checkout=? where checkout is null and userid=(select id from users where username=?)", (date, in_username))
-    flask.g.db.commit()
-    return c.rowcount
-
 
 
 if __name__ == '__main__':
