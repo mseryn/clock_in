@@ -24,10 +24,7 @@ def user_walkthrough():
             print('\nInvalid admin password.')
             quit()
     admin_boo = int(admin)
-
-    h_password = hash_pw(username, password)
-
-    make_user(username, h_password, admin_boo)
+    make_user(username, password, password_check, admin_boo)
 
 def make_user(in_username, in_password, in_password_check, in_admin_boo):
     db = sqlite3.connect('db.db')
@@ -36,10 +33,12 @@ def make_user(in_username, in_password, in_password_check, in_admin_boo):
 
     if in_password != in_password_check:
         print('The passwords did not match.')
-        quit()
+        return False
+    h_password = hash_pw(in_username, in_password)
 
-    c.execute("insert into users (username, password, admin) values (?,?,?)", (in_username, in_password, boo))
+    c.execute("insert into users (username, password, admin) values (?,?,?)", (in_username, h_password, boo))
     db.commit()
+    return True
 
 def hash_pw(username, password):
     return hashlib.md5(username.encode('utf-8') + password.encode('utf-8')).hexdigest()
