@@ -2,7 +2,8 @@
 Description=ClockIn
 
 [Service]
-ExecStart=/usr/bin/python clock_time.py
+WorkingDirectory=/root/clock_in #edit this, match clock_in location
+ExecStart=/usr/bin/python clock_in.py
 
 [Install]
 WantedBy=multi-user.target
