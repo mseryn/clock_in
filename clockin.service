@@ -1,0 +1,8 @@
+[Unit]
+Description=ClockIn
+
+[Service]
+ExecStart=/usr/bin/python clock_time.py
+
+[Install]
+WantedBy=multi-user.target
