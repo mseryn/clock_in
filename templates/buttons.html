@@ -3,9 +3,9 @@
 	{% if session.username %}
 	<form action="{{ url_for('buttons') }}" method=post>
 		{% if not checked_in %}
-			<input type=submit name='checkin' value='Check In' />
+			<input type=submit name='checkin' value='Check In' autofocus/>
 		{% else %}
-			<input type=submit name='checkout' value='Check Out' />
+			<input type=submit name='checkout' value='Check Out' autofocus/>
 		{% endif %}
 	</form>
 	{% endif %}
