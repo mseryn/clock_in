@@ -97,7 +97,8 @@ def checked_in(in_username):
     if recorded_time.date() == datetime.date.today():
         return True
     else:
-        write_checkout(in_username, datetime.datetime.combine(recorded_time.date(), datetime.datetime.time(23, 59, 59)))
+        return False
+	#write_checkout(in_username, datetime.datetime.combine(recorded_time.date(), datetime.datetime.time(23, 59, 59)))
 
     return True
 
